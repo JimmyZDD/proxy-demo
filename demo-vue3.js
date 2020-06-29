@@ -22,12 +22,13 @@ const baseHandler = {
     // Reflect.set
     // target[key] = val;
     const res = Reflect.set(target, key, val);
-    // @todo 响应式去通知变化 触发执行effect
+    // @todo 响应式去通知变化 触发执行，effect函数是响应式对象修改触发的
     trigger(target, key, info);
   },
 };
-
+// reactive() 函数接受一个普通对象 返回一个响应式数据对象
 function reactive(target) {
+  // 通过proxy将对象变为响应式
   const observed = new Proxy(target, baseHandler);
   //  返回proxy代理后的对象
   console.log(targetMap);
@@ -35,7 +36,7 @@ function reactive(target) {
 }
 
 function computed(fn) {
-  // 特殊的effect
+  // 可以认为是特殊的effect
   const runner = effect(fn, { computed: true, lazy: true });
   return {
     effect: runner,
@@ -50,6 +51,7 @@ function effect(fn, options = {}) {
   let e = createReactiveEffect(fn, options);
   // lazy是 computed配置的
   if (!options.lazy) {
+    // 不是懒执行
     e();
   }
   return e;
@@ -78,8 +80,10 @@ function run(effect, fn, args) {
     }
   }
 }
+// 全局变量
 let effectStack = []; // 存储effect
-let targetMap = new WeakMap();
+let targetMap = new WeakMap(); // 存储收集的依赖
+
 function track(target, key) {
   // 收集依赖
   const effect = effectStack[effectStack.length - 1];
@@ -117,6 +121,7 @@ function trigger(target, key, info) {
   //1.找到依赖
   const depMap = targetMap.get(target);
   if (depMap === undefined) {
+    // 没有依赖直接return
     return;
   }
   // 区分普通的effect和computed有优先级，effect先执行，computed后执行
@@ -132,6 +137,7 @@ function trigger(target, key, info) {
         effects.add(effect);
       }
     });
+    // 拆开执行
     effects.forEach((effect) => effect());
     computedRunners.forEach((computed) => computed());
   }
