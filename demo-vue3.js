@@ -36,8 +36,9 @@ function reactive(target) {
 }
 
 function computed(fn) {
-  // 可以认为是特殊的effect
+  // 可以认为是特殊的 effect
   const runner = effect(fn, { computed: true, lazy: true });
+  // 如果lazy不置为true的话，每次创建effect的时候都会立即执行一次
   return {
     effect: runner,
     get value() {
@@ -45,7 +46,7 @@ function computed(fn) {
     },
   };
 }
-
+// 副作用函数，响应式对象的修改会触发
 function effect(fn, options = {}) {
   // 依赖函数
   let e = createReactiveEffect(fn, options);
@@ -76,16 +77,23 @@ function run(effect, fn, args) {
       effectStack.push(effect);
       return fn(...args); // 执行effect
     } finally {
-      effectStack.pop(); // effect 执行完毕
+      effectStack.pop(); // effect 执行完毕出栈
     }
   }
 }
 // 全局变量
+// effect是副作用的意思，也就是说它是响应式副产品，每次触发了 get 时收集effect，每次set时在触发这些effects
+// 这样就可以做一些响应式数据之外的一些事情了，比如计算属性computed。
 let effectStack = []; // 存储effect
-let targetMap = new WeakMap(); // 存储收集的依赖
+
+// 每个target被触发的时候，都可能有多个effect，所以每个target需要有一个对应的依赖收集器 deps，
+// 等到 set 时遍历 deps 执行 effect()
+// 然而，这个依赖收集器 deps 不能放在 target 本身上，这样会使数据看起来不是很简洁，还会存在多余无用的数据，
+// 所以我们需要一个 map 集合来储存 target 跟 deps 的关系， 在vue中这个储存集合叫 targetMap
+let targetMap = new WeakMap(); // 存储target
 
 function track(target, key) {
-  // 收集依赖
+  // 收集依赖, 将所有 get 的 target 跟 key 以及 effect 建立起对应关系
   const effect = effectStack[effectStack.length - 1];
   if (effect) {
     let depMap = targetMap.get(target);
